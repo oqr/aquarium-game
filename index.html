@@ -6,9 +6,14 @@
 <title>Aquarium Adventure</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html { overflow: hidden; position: fixed; width: 100%; height: 100%; }
 body {
   overflow: hidden;
-  touch-action: none;
+  touch-action: manipulation;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  -webkit-overflow-scrolling: none;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: #000;
 }
@@ -91,6 +96,7 @@ canvas {
   max-width: 90vw;
   max-height: 80vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   color: white;
 }
 #inventory-panel h2 {
@@ -214,6 +220,7 @@ canvas {
 #mermaid-prompt {
   position: fixed;
   bottom: 160px; left: 50%;
+  pointer-events: auto;
   transform: translateX(-50%);
   background: rgba(156,39,176,0.9);
   color: white;
@@ -238,6 +245,8 @@ canvas {
   z-index: 50;
   display: none;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  pointer-events: auto;
 }
 #shop-panel {
   max-width: 420px;
@@ -328,6 +337,7 @@ canvas {
 #enter-aquarium-prompt {
   position: fixed;
   bottom: 100px; left: 50%;
+  pointer-events: auto;
   transform: translateX(-50%);
   background: rgba(13,71,161,0.9);
   color: white;
@@ -343,6 +353,7 @@ canvas {
 #dive-prompt {
   position: fixed;
   bottom: 160px; left: 50%;
+  pointer-events: auto;
   transform: translateX(-50%);
   background: rgba(21,101,192,0.9);
   color: white;
@@ -356,6 +367,8 @@ canvas {
   border: 2px solid #29B6F6;
 }
 #surface-btn {
+  min-width: 50px;
+  min-height: 50px;
   position: fixed;
   bottom: 100px; left: 50%;
   transform: translateX(-50%);
@@ -391,6 +404,7 @@ canvas {
 
 <div id="hud">
   <div id="money-display">$100</div>
+  <div id="hud-rating" style="color:#FFD700;font-size:14px;">⭐ --</div>
   <div id="hud-inventory">
     <span>🐟 <span id="hud-fish">0</span>/<span id="hud-fish-max">10</span></span>
     <span>🏛️ <span id="hud-tanked">0</span></span>
@@ -454,18 +468,16 @@ canvas {
 <script>
 // ============ GAME STATE ============
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { alpha: false });
+ctx.imageSmoothingEnabled = true;
 
 let W, H, DPR;
 function resize() {
-  DPR = window.devicePixelRatio || 1;
+  DPR = 1;
   W = window.innerWidth;
   H = window.innerHeight;
-  canvas.width = Math.round(W * DPR);
-  canvas.height = Math.round(H * DPR);
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  canvas.width = W;
+  canvas.height = H;
 }
 resize();
 window.addEventListener('resize', resize);
@@ -483,6 +495,7 @@ const STATE = {
   aquariumFish: [],
   aquariumDecorations: [],
   tankedFish: [], // permanent fish in tanks (survive between dives)
+  tankedDecos: [], // permanent decorations in tanks
 };
 
 // ============ PLAYER ============
@@ -1244,7 +1257,8 @@ function drawCreator(time) {
   drawCreatorCharacter(previewX, previewY, scale, time);
 
   // Options panel on right side -- clean simple grid
-  const SW = 34, SH = 34, GAP = 7, STEP = SW + GAP;
+  const isMobile = window.innerWidth < 768;
+  const SW = isMobile ? 44 : 34, SH = isMobile ? 44 : 34, GAP = isMobile ? 5 : 7, STEP = SW + GAP;
   const ox = Math.min(W * 0.38, previewX + ps + 24);
   const availW = W - ox - 14;
   const perRow = Math.max(1, Math.floor(availW / STEP));
@@ -1336,6 +1350,8 @@ function startGame() {
   player.targetX = player.x;
   player.targetY = player.y;
   document.getElementById('hud').style.display = 'flex';
+  document.getElementById('money-display').style.display = '';
+  document.getElementById('hud-inventory').style.display = '';
   document.getElementById('inventory-btn').style.display = 'flex';
   // Start visitor spawning on the beach
   initTankFish();
@@ -1644,10 +1660,14 @@ let aquariumCameraX = 0;
 const AQUARIUM_HALLWAY_W = 4600; // total width (tanks + café at the end)
 const AQUARIUM_FLOOR_Y = 0.78; // floor position as fraction of screen height
 
+let tankDecos = {};
+
 function initTankFish() {
   tankFish = {};
+  tankDecos = {};
   AQUARIUM_TANKS.forEach(tank => {
     tankFish[tank.zoneId] = [];
+    tankDecos[tank.zoneId] = [];
   });
   // Populate tanks from permanently deposited fish
   STATE.tankedFish.forEach(f => {
@@ -1662,6 +1682,16 @@ function initTankFish() {
       phase: Math.random() * Math.PI * 2,
       alive: true,
       size: f.isBoss ? Math.min(f.size * 0.5, 35) : Math.min(f.size * 0.7, 22),
+    });
+  });
+  // Populate tanks with decorations
+  STATE.tankedDecos.forEach(d => {
+    const zoneId = d.zone || 'coral';
+    if (!tankDecos[zoneId]) tankDecos[zoneId] = [];
+    tankDecos[zoneId].push({
+      ...d,
+      rx: 0.1 + Math.random() * 0.8,
+      ry: 0.85 + Math.random() * 0.1, // sit near bottom
     });
   });
 }
@@ -1912,6 +1942,7 @@ function spawnAllOceanLife() {
       const type = decoTypes[Math.floor(Math.random() * decoTypes.length)];
       oceanDecos.push({
         ...type,
+        zone: band.zone,
         x: 50 + Math.random() * (W - 100),
         y: band.endY - 30 + Math.random() * 20,
         collected: false,
@@ -1931,6 +1962,7 @@ function spawnAllOceanLife() {
     const type = bottomDecos[Math.floor(Math.random() * bottomDecos.length)];
     oceanDecos.push({
       ...type,
+      zone: 'deep',
       x: 50 + Math.random() * (W - 100),
       y: OCEAN_DEPTH - 50 + Math.random() * 30,
       collected: false,
@@ -2127,33 +2159,83 @@ function drawBeach(time) {
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Palm trees
+  // Palm trees (simple, fast)
   palmTrees.forEach(pt => {
     const px = W * pt.x;
     const py = H * 0.55;
-    // Trunk
-    ctx.strokeStyle = '#5D4037';
-    ctx.lineWidth = 12;
+    const lean = pt.x < 0.5 ? 1 : -1;
+    const topX = px + lean * 15;
+    const topY = py - pt.trunkH;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.07)';
     ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.quadraticCurveTo(px + 15, py - pt.trunkH * 0.5, px + 10, py - pt.trunkH);
-    ctx.stroke();
-    // Leaves
-    for (let a = 0; a < 5; a++) {
-      const angle = -Math.PI * 0.8 + a * (Math.PI * 0.4);
-      const leafLen = 50 + Math.sin(time * 0.001 + a) * 5;
-      ctx.strokeStyle = '#2E7D32';
-      ctx.lineWidth = 4;
+    ctx.ellipse(px + lean * 40, py + 6, 45, 5, lean * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Trunk - single tapered shape
+    ctx.fillStyle = '#6D4C41';
+    ctx.beginPath();
+    ctx.moveTo(px - 7, py);
+    ctx.lineTo(px + 7, py);
+    ctx.lineTo(topX + 4, topY);
+    ctx.lineTo(topX - 4, topY);
+    ctx.closePath();
+    ctx.fill();
+    // Bark rings
+    ctx.strokeStyle = '#795548';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 7; i++) {
+      const t = i / 7;
+      const rx = px + (topX - px) * t;
+      const ry = py + (topY - py) * t;
+      const rw = 7 - t * 3;
       ctx.beginPath();
-      ctx.moveTo(px + 10, py - pt.trunkH);
-      ctx.quadraticCurveTo(
-        px + 10 + Math.cos(angle) * leafLen * 0.5,
-        py - pt.trunkH + Math.sin(angle) * leafLen * 0.3,
-        px + 10 + Math.cos(angle) * leafLen,
-        py - pt.trunkH + Math.sin(angle) * leafLen
-      );
+      ctx.moveTo(rx - rw, ry);
+      ctx.lineTo(rx + rw, ry);
       ctx.stroke();
     }
+
+    // Coconuts
+    ctx.fillStyle = '#5D4037';
+    ctx.beginPath();
+    ctx.arc(topX - 6, topY + 7, 4, 0, Math.PI * 2);
+    ctx.arc(topX + 1, topY + 9, 4, 0, Math.PI * 2);
+    ctx.arc(topX + 7, topY + 6, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Fronds - thick curved strokes with pointed ends (fast, no leaflets)
+    const sway = Math.sin(time * 0.001) * 0.06;
+    const fronds = [
+      { a: -2.3 + sway, len: 60, c: '#2E7D32' },
+      { a: -1.5 + sway, len: 65, c: '#388E3C' },
+      { a: -0.6 + sway, len: 58, c: '#43A047' },
+      { a: 0.3 - sway, len: 62, c: '#388E3C' },
+      { a: 1.0 - sway, len: 55, c: '#2E7D32' },
+      { a: 1.7 - sway, len: 50, c: '#43A047' },
+    ];
+    fronds.forEach(f => {
+      const tipX2 = topX + Math.cos(f.a) * f.len;
+      const tipY2 = topY + Math.sin(f.a) * f.len * 0.65;
+      // Thick frond shape (leaf-like, tapers to point)
+      ctx.fillStyle = f.c;
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      const midX = topX + Math.cos(f.a) * f.len * 0.4;
+      const midY = topY + Math.sin(f.a) * f.len * 0.25 - 5;
+      const perpX = Math.sin(f.a) * 8;
+      const perpY = -Math.cos(f.a) * 5;
+      ctx.quadraticCurveTo(midX + perpX, midY + perpY, tipX2, tipY2);
+      ctx.quadraticCurveTo(midX - perpX, midY - perpY, topX, topY);
+      ctx.fill();
+      // Center vein
+      ctx.strokeStyle = '#1B5E20';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.quadraticCurveTo(midX, midY, tipX2, tipY2);
+      ctx.stroke();
+    });
   });
 
   // Aquarium building (large, enterable)
@@ -2468,7 +2550,7 @@ function drawOcean(time) {
   });
 
   // Bubbles (in screen coords)
-  if (Math.random() < 0.1) {
+  if (Math.random() < 0.03) {
     bubbles.push({
       x: player.x + (Math.random() - 0.5) * 20,
       y: player.y - cameraY - 10,
@@ -3470,6 +3552,80 @@ function drawDecoration(d, time) {
   ctx.fill();
 }
 
+// ============ AQUARIUM RATING ============
+STATE.aquariumRating = 0; // 0-5 stars, updated live
+STATE.reviewCount = 0;
+STATE.reviewTotal = 0; // sum of all star ratings given
+
+function calcTankRating(zoneId) {
+  const fish = STATE.tankedFish.filter(f => {
+    const fZone = f.isBoss ? 'monster' : (f.zone || 'coral');
+    return fZone === zoneId;
+  });
+  const decos = STATE.tankedDecos.filter(d => (d.zone || 'coral') === zoneId);
+  if (fish.length === 0 && decos.length === 0) return 0;
+  const totalValue = fish.reduce((sum, f) => sum + (f.value || 10), 0);
+  const fishCount = fish.length;
+  const decoCount = decos.length;
+  // Rating: fish count + value are primary, decorations add a bonus
+  let stars = Math.min(fishCount * 0.7, 3.0) + Math.min(totalValue / 200, 1.2) + Math.min(decoCount * 0.25, 0.8);
+  if (fishCount === 0) stars = Math.min(stars, 1.5); // decos alone cap at 1.5
+  return Math.max(0.5, Math.min(5, Math.round(stars * 2) / 2));
+}
+
+function calcOverallRating() {
+  // Average of non-empty tank ratings, or use review history
+  const tankRatings = AQUARIUM_TANKS.map(t => calcTankRating(t.zoneId)).filter(r => r > 0);
+  if (tankRatings.length === 0 && STATE.reviewCount === 0) return 0;
+  // Blend: 60% tank quality, 40% visitor reviews (if any)
+  const tankAvg = tankRatings.length > 0 ? tankRatings.reduce((a, b) => a + b, 0) / tankRatings.length : 0;
+  if (STATE.reviewCount === 0) return tankAvg;
+  const reviewAvg = STATE.reviewTotal / STATE.reviewCount;
+  return tankRatings.length > 0 ? tankAvg * 0.6 + reviewAvg * 0.4 : reviewAvg;
+}
+
+function updateRatingDisplay() {
+  const rating = calcOverallRating();
+  STATE.aquariumRating = rating;
+  const el = document.getElementById('hud-rating');
+  if (rating <= 0) {
+    el.textContent = '⭐ --';
+  } else {
+    const full = Math.floor(rating);
+    const half = rating - full >= 0.5;
+    let stars = '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(5 - full - (half ? 1 : 0));
+    el.textContent = `${stars} ${rating.toFixed(1)}`;
+  }
+}
+
+function visitorReviewTank(zoneId, visitor) {
+  const tankRating = calcTankRating(zoneId);
+  if (tankRating <= 0) return; // empty tank, no review
+
+  // Add some randomness (+/- 0.5)
+  const jitter = (Math.random() - 0.5);
+  const review = Math.max(1, Math.min(5, Math.round((tankRating + jitter) * 2) / 2));
+
+  STATE.reviewCount++;
+  STATE.reviewTotal += review;
+
+  // Floating review text
+  const tankNames = {};
+  AQUARIUM_TANKS.forEach(t => { tankNames[t.zoneId] = t.name; });
+  const starText = review >= 5 ? '⭐⭐⭐⭐⭐' : review >= 4 ? '⭐⭐⭐⭐' : review >= 3 ? '⭐⭐⭐' : review >= 2 ? '⭐⭐' : '⭐';
+
+  floatingTexts.push({ text: starText, x: visitor.x, y: visitor.y - 60, life: 100 });
+
+  // 5-star bonus
+  if (review >= 5) {
+    STATE.money += 20;
+    updateMoney();
+    floatingTexts.push({ text: '+$20 (5⭐!)', x: visitor.x + 20, y: visitor.y - 80, life: 100 });
+  }
+
+  updateRatingDisplay();
+}
+
 // ============ VISITORS ============
 const VISITOR_COLORS = ['#E57373','#64B5F6','#81C784','#FFB74D','#BA68C8','#4DD0E1','#FF8A65','#AED581','#F06292','#90A4AE'];
 const VISITOR_HATS = ['none','beanie','cap','bow','sunhat'];
@@ -3495,7 +3651,13 @@ function calcTotalFishCount() {
 
 function getVisitorSpawnRate() {
   const fishCount = calcTotalFishCount();
-  return Math.max(4000, 12000 - fishCount * 400);
+  let rate = Math.max(4000, 12000 - fishCount * 400);
+  // Rating bonus/penalty: high rating = faster spawns, low = slower
+  const rating = STATE.aquariumRating;
+  if (rating >= 4) rate *= 0.7;       // good rating: 30% faster
+  else if (rating >= 3) rate *= 0.85;  // decent
+  else if (rating > 0 && rating < 2) rate *= 1.5; // bad rating: 50% slower
+  return rate;
 }
 
 function spawnBeachVisitor() {
@@ -3510,7 +3672,7 @@ function spawnBeachVisitor() {
     skinIdx: Math.floor(Math.random() * 5),
     x: W + 30,
     y: groundY,
-    speed: 1.2 + Math.random() * 0.5,
+    speed: 2.5 + Math.random() * 0.8,
     queueX: boothX + 40 + queueSlot * 28,
     state: 'walking_to_booth',
     waitTimer: 0,
@@ -3552,7 +3714,7 @@ function updateBeachVisitors() {
         const floorY = H * AQUARIUM_FLOOR_Y;
         visitors.push({
           x: 90, y: floorY, targetX: AQUARIUM_HALLWAY_W - 100,
-          speed: 1.2 + Math.random() * 0.6,
+          speed: 2.5 + Math.random() * 1.0,
           color: v.color, hat: v.hat, phase: v.phase, skinIdx: v.skinIdx,
           returning: false, lookTimer: 0, lookAt: -1, gone: false,
         });
@@ -3604,6 +3766,17 @@ function updateVisitors(time) {
       v.lookTimer--;
       if (v.cafeState === 'eating') {
         v.eatBob = Math.sin((time || 0) * 0.006 + v.phase) * 2;
+      }
+      // Review tank when done looking
+      if (v.lookTimer <= 0 && v.lookAt >= 0 && !v.cafeState && !v.reviewed) {
+        const tank = AQUARIUM_TANKS[v.lookAt];
+        if (tank) {
+          if (!v.reviewed) v.reviewed = {};
+          if (!v.reviewed[tank.zoneId]) {
+            v.reviewed[tank.zoneId] = true;
+            visitorReviewTank(tank.zoneId, v);
+          }
+        }
       }
       return;
     }
@@ -3831,275 +4004,113 @@ function drawCafe(time, floorY) {
 }
 
 const HAIR_COLORS_V = ['#1a1a1a','#3E2723','#5D4037','#8D6E63','#FFD54F','#FF8A65','#B71C1C','#E0E0E0'];
-const HAIR_STYLES_V = ['short','medium','bob','ponytail','bun'];
 
 function drawVisitor(v, time) {
-  const s = 50; // bigger, more realistic
+  const s = 50;
   const bob = v.cafeState === 'eating' ? (v.eatBob || 0) : Math.sin(time * 0.004 + v.phase) * 1.5;
   const dir = v.returning ? -1 : 1;
   const walking = !v.lookTimer && v.cafeState !== 'eating';
   const legSwing = walking ? Math.sin(time * 0.008 + v.phase) * 5 : 0;
-  const armSwing = walking ? Math.sin(time * 0.008 + v.phase) * 0.25 : 0;
 
-  // Deterministic appearance from phase
   const skinTones = ['#FDDBB4','#F0C27F','#D2A679','#A67C52','#8D5524'];
   const skinColor = skinTones[(v.skinIdx || Math.floor(v.phase * 10)) % skinTones.length];
   const hairColor = HAIR_COLORS_V[Math.floor(v.phase * 7 + 1) % HAIR_COLORS_V.length];
-  const hairStyle = HAIR_STYLES_V[Math.floor(v.phase * 11 + 2) % HAIR_STYLES_V.length];
-  const headR = s * 0.16;
-  const headY = -s * 0.52;
-  const neckY = headY + headR;
-  const shoulderY = neckY + s * 0.06;
-  const torsoW = s * 0.28;
-  const torsoH = s * 0.32;
-  const hipY = shoulderY + torsoH;
+  const pantsColor = ['#37474F','#1A237E','#4E342E','#263238'][Math.floor(v.phase * 13) % 4];
 
   ctx.save();
   ctx.translate(v.x, v.y);
 
-  // === HAIR behind head (long styles only) ===
-  if (hairStyle === 'ponytail' && v.hat === 'none') {
-    ctx.fillStyle = hairColor;
-    ctx.beginPath();
-    ctx.moveTo(-headR * 0.3, headY - headR * 0.2);
-    ctx.quadraticCurveTo(-headR * 0.8, headY + headR * 0.5, -headR * 0.5, shoulderY + s * 0.08);
-    ctx.lineTo(-headR * 0.2, shoulderY + s * 0.05);
-    ctx.quadraticCurveTo(-headR * 0.4, headY + headR * 0.3, -headR * 0.1, headY - headR * 0.1);
-    ctx.fill();
-  }
-
-  // === LEGS ===
-  const legW = s * 0.08;
-  const legH = s * 0.32;
-  const pantsColors = ['#37474F','#1A237E','#4E342E','#263238','#546E7A'];
-  ctx.fillStyle = pantsColors[Math.floor(v.phase * 13) % pantsColors.length];
-  // Left leg
-  ctx.save();
-  ctx.translate(-s * 0.07, hipY + bob);
-  ctx.rotate(legSwing * 0.6);
-  ctx.beginPath();
-  ctx.roundRect(-legW / 2, 0, legW, legH, 3);
-  ctx.fill();
-  // Shoe
-  ctx.fillStyle = '#333';
-  ctx.beginPath();
-  ctx.roundRect(-legW / 2 - 1, legH - 2, legW + 4, s * 0.06, 2);
-  ctx.fill();
+  // Legs
+  ctx.fillStyle = pantsColor;
+  ctx.save(); ctx.translate(-s*0.07, s*0.22 + bob); ctx.rotate(legSwing * 0.5);
+  ctx.fillRect(-s*0.04, 0, s*0.08, s*0.28);
+  ctx.fillStyle = '#333'; ctx.fillRect(-s*0.05, s*0.26, s*0.1, s*0.04); // shoe
   ctx.restore();
-  // Right leg
-  ctx.save();
-  ctx.translate(s * 0.07, hipY + bob);
-  ctx.rotate(-legSwing * 0.6);
-  ctx.beginPath();
-  ctx.fillStyle = pantsColors[Math.floor(v.phase * 13) % pantsColors.length];
-  ctx.roundRect(-legW / 2, 0, legW, legH, 3);
-  ctx.fill();
-  ctx.fillStyle = '#333';
-  ctx.beginPath();
-  ctx.roundRect(-legW / 2 - 1, legH - 2, legW + 4, s * 0.06, 2);
-  ctx.fill();
+  ctx.fillStyle = pantsColor;
+  ctx.save(); ctx.translate(s*0.07, s*0.22 + bob); ctx.rotate(-legSwing * 0.5);
+  ctx.fillRect(-s*0.04, 0, s*0.08, s*0.28);
+  ctx.fillStyle = '#333'; ctx.fillRect(-s*0.05, s*0.26, s*0.1, s*0.04);
   ctx.restore();
 
-  // === TORSO ===
+  // Torso
   ctx.fillStyle = v.color;
   ctx.beginPath();
-  ctx.roundRect(-torsoW / 2, shoulderY + bob, torsoW, torsoH, 4);
-  ctx.fill();
-  // Collar / neckline detail
-  ctx.fillStyle = 'rgba(0,0,0,0.08)';
-  ctx.beginPath();
-  ctx.ellipse(0, shoulderY + bob + 3, torsoW * 0.3, 4, 0, 0, Math.PI);
+  ctx.roundRect(-s*0.14, -s*0.12 + bob, s*0.28, s*0.36, 4);
   ctx.fill();
 
-  // === ARMS ===
-  const armW = s * 0.06;
-  const armH = s * 0.26;
+  // Arms
   ctx.fillStyle = skinColor;
-  // Left arm
-  ctx.save();
-  ctx.translate(-torsoW / 2 - armW * 0.3, shoulderY + bob + s * 0.03);
-  ctx.rotate(-armSwing);
-  ctx.beginPath();
-  ctx.roundRect(-armW / 2, 0, armW, armH, 3);
-  ctx.fill();
-  // Hand
-  ctx.beginPath();
-  ctx.arc(0, armH + 2, armW * 0.7, 0, Math.PI * 2);
-  ctx.fill();
+  const armSwing = walking ? Math.sin(time * 0.008 + v.phase) * 0.2 : 0;
+  ctx.save(); ctx.translate(-s*0.17, -s*0.08 + bob); ctx.rotate(-0.1 - armSwing);
+  ctx.fillRect(-s*0.03, 0, s*0.06, s*0.22);
+  ctx.beginPath(); ctx.arc(0, s*0.23, s*0.035, 0, Math.PI*2); ctx.fill();
   ctx.restore();
-  // Right arm
-  ctx.save();
-  ctx.translate(torsoW / 2 + armW * 0.3, shoulderY + bob + s * 0.03);
-  ctx.rotate(armSwing);
-  ctx.beginPath();
-  ctx.roundRect(-armW / 2, 0, armW, armH, 3);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(0, armH + 2, armW * 0.7, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.save(); ctx.translate(s*0.17, -s*0.08 + bob); ctx.rotate(0.1 + armSwing);
+  ctx.fillRect(-s*0.03, 0, s*0.06, s*0.22);
+  ctx.beginPath(); ctx.arc(0, s*0.23, s*0.035, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 
-  // === NECK ===
+  // Neck
   ctx.fillStyle = skinColor;
+  ctx.fillRect(-s*0.03, -s*0.18 + bob, s*0.06, s*0.07);
+
+  // Head
+  const headY = -s*0.28 + bob;
+  ctx.beginPath(); ctx.arc(0, headY, s*0.12, 0, Math.PI*2); ctx.fill();
+
+  // Hair (simple: just a cap on top of head)
+  ctx.fillStyle = hairColor;
   ctx.beginPath();
-  ctx.roundRect(-s * 0.04, neckY + bob, s * 0.08, s * 0.08, 2);
+  ctx.ellipse(0, headY - s*0.04, s*0.13, s*0.09, 0, Math.PI, Math.PI*2);
   ctx.fill();
 
-  // === HEAD ===
-  ctx.fillStyle = skinColor;
-  ctx.beginPath();
-  ctx.arc(0, headY + bob, headR, 0, Math.PI * 2);
-  ctx.fill();
-  // Subtle cheek shading
-  ctx.fillStyle = 'rgba(0,0,0,0.04)';
-  ctx.beginPath();
-  ctx.arc(headR * 0.3, headY + bob + headR * 0.15, headR * 0.6, 0, Math.PI * 2);
-  ctx.fill();
-
-  // === HAIR on top of head ===
-  if (v.hat === 'none') {
-    ctx.fillStyle = hairColor;
-    if (hairStyle === 'short') {
-      // Close-cropped, sits on top of head only
-      ctx.beginPath();
-      ctx.ellipse(0, headY - headR * 0.15 + bob, headR * 1.05, headR * 0.55, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      // Side tufts
-      ctx.beginPath();
-      ctx.ellipse(-headR * 0.85, headY + bob, headR * 0.25, headR * 0.4, 0.15, 0, Math.PI * 2);
-      ctx.ellipse(headR * 0.85, headY + bob, headR * 0.25, headR * 0.4, -0.15, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (hairStyle === 'medium') {
-      // Medium length, covers top and sides of head, stops at ears
-      ctx.beginPath();
-      ctx.ellipse(0, headY - headR * 0.2 + bob, headR * 1.12, headR * 0.7, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(-headR * 0.8, headY + headR * 0.1 + bob, headR * 0.35, headR * 0.5, 0.2, 0, Math.PI * 2);
-      ctx.ellipse(headR * 0.8, headY + headR * 0.1 + bob, headR * 0.35, headR * 0.5, -0.2, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (hairStyle === 'bob') {
-      // Bob cut, frames face, stops at jaw
-      ctx.beginPath();
-      ctx.ellipse(0, headY - headR * 0.15 + bob, headR * 1.15, headR * 0.65, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      // Side panels down to jaw
-      ctx.beginPath();
-      ctx.roundRect(-headR * 1.1, headY - headR * 0.1 + bob, headR * 0.35, headR * 1.3, 3);
-      ctx.roundRect(headR * 0.75, headY - headR * 0.1 + bob, headR * 0.35, headR * 1.3, 3);
-      ctx.fill();
-    } else if (hairStyle === 'ponytail') {
-      // Top hair volume (ponytail drawn behind already)
-      ctx.beginPath();
-      ctx.ellipse(0, headY - headR * 0.2 + bob, headR * 1.08, headR * 0.6, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-    } else if (hairStyle === 'bun') {
-      // Top hair + bun on top
-      ctx.beginPath();
-      ctx.ellipse(0, headY - headR * 0.2 + bob, headR * 1.05, headR * 0.55, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(0, headY - headR * 0.7 + bob, headR * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // === HAT (drawn over hair) ===
+  // Hat (if any, over hair)
   if (v.hat === 'beanie') {
     ctx.fillStyle = '#E53935';
-    ctx.beginPath();
-    ctx.ellipse(0, headY - headR * 0.15 + bob, headR * 1.1, headR * 0.7, 0, Math.PI, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#C62828';
-    ctx.beginPath();
-    ctx.ellipse(0, headY - headR * 0.05 + bob, headR * 1.12, headR * 0.15, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, headY - s*0.04, s*0.13, s*0.08, 0, Math.PI, Math.PI*2); ctx.fill();
   } else if (v.hat === 'cap') {
     ctx.fillStyle = '#1565C0';
-    ctx.beginPath();
-    ctx.ellipse(0, headY - headR * 0.2 + bob, headR * 1.05, headR * 0.55, 0, Math.PI, Math.PI * 2);
-    ctx.fill();
-    // Brim
-    ctx.beginPath();
-    ctx.ellipse(dir * headR * 0.6, headY - headR * 0.1 + bob, headR * 0.7, headR * 0.12, dir * -0.2, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (v.hat === 'bow') {
-    ctx.fillStyle = '#F06292';
-    ctx.beginPath();
-    ctx.ellipse(headR * 0.5, headY - headR * 0.6 + bob, headR * 0.35, headR * 0.2, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(headR * 0.8, headY - headR * 0.5 + bob, headR * 0.25, headR * 0.15, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#E91E63';
-    ctx.beginPath();
-    ctx.arc(headR * 0.65, headY - headR * 0.55 + bob, 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, headY - s*0.04, s*0.13, s*0.07, 0, Math.PI, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(dir*s*0.08, headY - s*0.02, s*0.08, s*0.02, 0, 0, Math.PI*2); ctx.fill();
   } else if (v.hat === 'sunhat') {
     ctx.fillStyle = '#D4A843';
-    ctx.beginPath();
-    ctx.ellipse(0, headY - headR * 0.1 + bob, headR * 1.6, headR * 0.18, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(0, headY - headR * 0.25 + bob, headR * 1.0, headR * 0.55, 0, Math.PI, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#A0522D';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(0, headY - headR * 0.1 + bob, headR * 1.0, headR * 0.1, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, headY - s*0.02, s*0.2, s*0.03, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, headY - s*0.05, s*0.12, s*0.07, 0, Math.PI, Math.PI*2); ctx.fill();
+  } else if (v.hat === 'bow') {
+    ctx.fillStyle = '#F06292';
+    ctx.beginPath(); ctx.ellipse(s*0.07, headY - s*0.1, s*0.05, s*0.03, 0.3, 0, Math.PI*2); ctx.fill();
   }
 
-  // === EYES ===
+  // Eyes
   const lookDir = v.lookTimer > 0 ? 0 : dir;
-  const eyeY = headY + bob - headR * 0.08;
   ctx.fillStyle = 'white';
   ctx.beginPath();
-  ctx.ellipse(-headR * 0.35, eyeY, headR * 0.18, headR * 0.14, 0, 0, Math.PI * 2);
-  ctx.ellipse(headR * 0.35, eyeY, headR * 0.18, headR * 0.14, 0, 0, Math.PI * 2);
+  ctx.arc(-s*0.04, headY - s*0.01, s*0.025, 0, Math.PI*2);
+  ctx.arc(s*0.04, headY - s*0.01, s*0.025, 0, Math.PI*2);
   ctx.fill();
-  // Iris
-  ctx.fillStyle = '#5D4037';
-  ctx.beginPath();
-  ctx.arc(-headR * 0.35 + lookDir * 1.5, eyeY, headR * 0.09, 0, Math.PI * 2);
-  ctx.arc(headR * 0.35 + lookDir * 1.5, eyeY, headR * 0.09, 0, Math.PI * 2);
-  ctx.fill();
-  // Pupil
   ctx.fillStyle = '#1a1a1a';
   ctx.beginPath();
-  ctx.arc(-headR * 0.35 + lookDir * 1.5, eyeY, headR * 0.04, 0, Math.PI * 2);
-  ctx.arc(headR * 0.35 + lookDir * 1.5, eyeY, headR * 0.04, 0, Math.PI * 2);
-  ctx.fill();
-  // Eye highlight
-  ctx.fillStyle = 'white';
-  ctx.beginPath();
-  ctx.arc(-headR * 0.3 + lookDir, eyeY - headR * 0.04, headR * 0.03, 0, Math.PI * 2);
-  ctx.arc(headR * 0.4 + lookDir, eyeY - headR * 0.04, headR * 0.03, 0, Math.PI * 2);
+  ctx.arc(-s*0.04 + lookDir, headY - s*0.01, s*0.013, 0, Math.PI*2);
+  ctx.arc(s*0.04 + lookDir, headY - s*0.01, s*0.013, 0, Math.PI*2);
   ctx.fill();
 
-  // === NOSE ===
-  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+  // Mouth
+  ctx.strokeStyle = 'rgba(60,30,20,0.4)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(headR * 0.05, headY + bob + headR * 0.15, headR * 0.08, 0.5, Math.PI - 0.5);
+  ctx.arc(0, headY + s*0.05, s*0.03, 0.2, Math.PI - 0.2);
   ctx.stroke();
 
-  // === MOUTH (polite, closed) ===
-  ctx.strokeStyle = 'rgba(60,30,20,0.5)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(0, headY + bob + headR * 0.4, headR * 0.2, 0.2, Math.PI - 0.2);
-  ctx.stroke();
-
-  // === FOOD when eating ===
+  // Food when eating
   if (v.cafeState === 'eating' && v.cafeItem) {
-    ctx.font = '16px sans-serif';
+    ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(v.cafeItem.emoji, torsoW / 2 + s * 0.12, shoulderY + bob + torsoH * 0.5);
+    ctx.fillText(v.cafeItem.emoji, s*0.2, -s*0.05 + bob);
   }
 
   ctx.restore();
 }
+
 
 function drawFloatingTexts() {
   floatingTexts.forEach(ft => {
@@ -4456,8 +4467,14 @@ function drawWallTank(tank, tx, ty, tw, th, time) {
     ctx.beginPath(); ctx.arc(bx + Math.sin(time * 0.002 + b) * 5, by, bSize, 0, Math.PI * 2); ctx.stroke();
   }
 
+  // Tank decorations
+  const decos = tankDecos[tank.zoneId] || [];
+  decos.forEach(d => {
+    drawDecoration({ ...d, x: tx + d.rx * tw, y: ty + d.ry * th }, time);
+  });
+
   // Fish in tank (only caught fish appear here)
-  if (fish.length === 0) {
+  if (fish.length === 0 && decos.length === 0) {
     // Empty tank message
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.font = 'bold 16px sans-serif';
@@ -4557,6 +4574,12 @@ function drawTank(tank, tx, ty, tw, th, time) {
   const sandColor = tank.zoneId === 'kelp' ? '#4E342E' : '#8D6E63';
   ctx.fillStyle = sandColor;
   ctx.fillRect(tx, ty + waterH - 18, tw, 18);
+
+  // Tank decorations
+  const smallDecos = tankDecos[tank.zoneId] || [];
+  smallDecos.forEach(d => {
+    drawDecoration({ ...d, x: tx + d.rx * tw, y: ty + d.ry * waterH }, time);
+  });
 
   // Fish in tank
   fish.forEach(f => {
@@ -4670,13 +4693,20 @@ function surface() {
   player.targetY = player.y;
 
   // Empty backpack into tanks
-  if (STATE.inventory.fish.length > 0) {
-    const count = STATE.inventory.fish.length;
+  const fishCount = STATE.inventory.fish.length;
+  const decoCount = STATE.inventory.decorations.length;
+  if (fishCount > 0 || decoCount > 0) {
     STATE.tankedFish.push(...STATE.inventory.fish);
+    STATE.tankedDecos.push(...STATE.inventory.decorations);
     STATE.inventory.fish = [];
+    STATE.inventory.decorations = [];
     updateInventory();
     initTankFish();
-    showResult(`${count} fish added to your tanks!`, 2000);
+    const parts = [];
+    if (fishCount > 0) parts.push(`${fishCount} fish`);
+    if (decoCount > 0) parts.push(`${decoCount} decorations`);
+    showResult(`${parts.join(' + ')} added to your tanks!`, 2000);
+    updateRatingDisplay();
   }
 }
 
@@ -4759,6 +4789,7 @@ function startCatchMinigame() {
   };
 
   document.getElementById('catch-minigame').style.display = 'flex';
+  gamePaused = true;
   drawMinigame(performance.now());
 
   setTimeout(() => {
@@ -4806,7 +4837,9 @@ function drawMinigame(now) {
 
   // Update ball position (bounces left-right)
   if (mg.active) {
-    mg.ballX += mg.ballSpeed * mg.ballDir;
+    const dt = mg.lastTime ? Math.min(now - mg.lastTime, 50) : 16;
+    mg.lastTime = now;
+    mg.ballX += mg.ballSpeed * mg.ballDir * dt * 0.06;
     if (mg.ballX > W2 - 25) { mg.ballDir = -1; mg.ballX = W2 - 25; }
     if (mg.ballX < 25) { mg.ballDir = 1; mg.ballX = 25; }
 
@@ -5058,6 +5091,7 @@ function swingNet() {
 
 function endMinigame(success) {
   document.getElementById('catch-minigame').style.display = 'none';
+  gamePaused = false;
   if (minigameState?.timer) clearTimeout(minigameState.timer);
 
   const wasBossRound = minigameState?.isBossRound;
@@ -5189,7 +5223,9 @@ function startBossRound() {
     bossRoundNum: bossRound,
   };
 
+  gamePaused = true;
   document.getElementById('catch-minigame').style.display = 'flex';
+  gamePaused = true;
   drawMinigame(performance.now());
 
   setTimeout(() => {
@@ -5520,7 +5556,7 @@ function handleClick(e) {
       const dist = Math.hypot(cx - d.x, cy - dScreenY);
       if (dist < 25) {
         if (STATE.inventory.decorations.length < STATE.maxDeco) {
-          STATE.inventory.decorations.push({ name: d.name, color: d.color, shape: d.shape });
+          STATE.inventory.decorations.push({ name: d.name, color: d.color, shape: d.shape, zone: d.zone || 'coral' });
           d.collected = true;
           updateInventory();
           showResult(`Found ${d.name}!`, 1200);
@@ -5607,14 +5643,38 @@ function draw(time) {
 
 // Init
 updateInventory();
+updateRatingDisplay();
 
 // Hide game UI until creator is done
-document.getElementById('hud').style.display = 'none';
+// Hide HUD parts until game starts, but keep rating visible
+document.getElementById('hud').style.display = 'flex';
+document.getElementById('money-display').style.display = 'none';
+document.getElementById('hud-inventory').style.display = 'none';
 document.getElementById('inventory-btn').style.display = 'none';
 
+let gamePaused = false;
+let fpsFrames = 0, fpsLast = 0, fpsDisplay = 0;
+let perfTest = false;
 function gameLoop(time) {
-  update();
-  draw(time);
+  fpsFrames++;
+  if (time - fpsLast > 1000) { fpsDisplay = fpsFrames; fpsFrames = 0; fpsLast = time; }
+  if (perfTest) {
+    // Draw ONLY the FPS counter, nothing else
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 200, 40);
+    ctx.fillStyle = fpsDisplay < 50 ? '#EF5350' : '#66BB6A';
+    ctx.font = 'bold 20px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(fpsDisplay + ' FPS (empty test)', 8, 28);
+  } else {
+    if (!gamePaused) { update(); draw(time); }
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, 70, 22);
+    ctx.fillStyle = fpsDisplay < 30 ? '#EF5350' : '#66BB6A';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(fpsDisplay + ' FPS', 8, 16);
+  }
   requestAnimationFrame(gameLoop);
 }
 requestAnimationFrame(gameLoop);
