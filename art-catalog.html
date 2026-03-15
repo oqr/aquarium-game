@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aquarium Game - Art Catalog</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a1a;
+  color: white;
+  font-family: 'Segoe UI', sans-serif;
+  padding: 20px;
+}
+h1 { text-align: center; color: #4FC3F7; margin-bottom: 10px; font-size: 28px; }
+h2 { color: #FFD700; margin: 30px 0 15px; font-size: 22px; border-bottom: 2px solid #333; padding-bottom: 8px; }
+h3 { color: #81C784; margin: 15px 0 10px; font-size: 16px; }
+.subtitle { text-align: center; color: #90CAF9; margin-bottom: 30px; font-size: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+.card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+}
+.card canvas { border-radius: 8px; display: block; margin: 0 auto 8px; }
+.card .label { font-size: 13px; color: #ccc; }
+.card .number {
+  position: absolute; top: 5px; left: 5px;
+  background: #FFD700; color: #000; font-weight: bold; font-size: 12px;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.card { position: relative; }
+.card .rarity { font-size: 11px; font-weight: bold; margin-top: 3px; }
+.rarity-common { color: #9E9E9E; }
+.rarity-uncommon { color: #66BB6A; }
+.rarity-rare { color: #42A5F5; }
+.rarity-legendary { color: #FFD700; }
+.rarity-megarare { color: #E040FB; }
+.zone-map { margin: 20px auto; display: block; border-radius: 12px; border: 2px solid #1a3a5c; }
+.standalone-wrap { position: relative; display: inline-block; margin: 0 auto; }
+.standalone-wrap .number {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  background: #FFD700; color: #000; font-weight: bold; font-size: 14px;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.note { color: #78909C; font-size: 12px; font-style: italic; margin: 5px 0 15px; }
+</style>
+</head>
+<body>
+
+<h1>Aquarium Adventure - Art Catalog</h1>
+<p class="subtitle">Visual mockups based on the art pack drawings. Review and approve before adding to game!</p>
+
+<!-- ============ ZONE MAP ============ -->
+<h2>1. World Map (Vertical Ocean)</h2>
+<p class="note">From IMG_1197: The ocean is vertical. You start at the aquarium and dive down through zones.</p>
+<div class="standalone-wrap" style="display:block; text-align:center;">
+  <div style="position:relative; display:inline-block;">
+    <div class="number" id="zone-map-num"></div>
+    <canvas id="zone-map" class="zone-map" width="400" height="600"></canvas>
+  </div>
+</div>
+
+<!-- ============ CREATURES BY RARITY ============ -->
+<h2>2. Creatures by Rarity</h2>
+
+<h3>Common</h3>
+<div class="row" id="common-row"></div>
+
+<h3>Uncommon</h3>
+<div class="row" id="uncommon-row"></div>
+
+<h3>Rare</h3>
+<div class="row" id="rare-row"></div>
+
+<h3>Legendary</h3>
+<div class="row" id="legendary-row"></div>
+
+<h3>Mega Rare</h3>
+<div class="row" id="megarare-row"></div>
+
+<!-- ============ BOSSES ============ -->
+<h2>3. Bosses</h2>
+<p class="note">From IMG_1144/1145: Fan-tentacle bosses with square body and curly antennae. From IMG_1117: "Lorian" sea dragon.</p>
+<div class="row" id="boss-row"></div>
+
+<!-- ============ CHARACTERS ============ -->
+<h2>4. Character Poses</h2>
+<p class="note">From IMG_1174-1179: Character animation states for swimming, fighting, suffocating, etc.</p>
+<div class="row" id="char-row"></div>
+
+<!-- ============ ENVIRONMENT ============ -->
+<h2>5. Sea Plants & Environment</h2>
+<p class="note">From IMG_1180-1190: Kelp, seaweed, bull kelp, pipe coral, sea anemone.</p>
+<div class="row" id="env-row"></div>
+
+<!-- ============ SHOP ITEMS ============ -->
+<h2>6. Shop Items</h2>
+<p class="note">From IMG_1128-1131, 1167-1173: Wallpaper, plants, accessories, potions.</p>
+<div class="row" id="shop-row"></div>
+
+<!-- ============ CHARACTER CREATOR ============ -->
+<h2>7. Character Creator</h2>
+<p class="note">From IMG_1198: Rows of customization options: hair, body, pants, suits, shoes, shirt.</p>
+<div class="standalone-wrap" style="display:block; text-align:center;">
+  <div style="position:relative; display:inline-block;">
+    <div class="number" id="creator-num"></div>
+    <canvas id="creator-canvas" width="600" height="300" style="border-radius:12px; border:2px solid #1a3a5c; display:block; margin:0 auto;"></canvas>
+  </div>
+</div>
+
+<script>
+const DPR = window.devicePixelRatio || 1;
+
+function makeCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w * DPR; c.height = h * DPR;
+  c.style.width = w + 'px'; c.style.height = h + 'px';
+  const ctx = c.getContext('2d');
+  ctx.scale(DPR, DPR);
+  return { c, ctx, w, h };
+}
+
+function fixCanvas(id, w, h) {
+  const c = document.getElementById(id);
+  c.width = w * DPR; c.height = h * DPR;
+  c.style.width = w + 'px'; c.style.height = h + 'px';
+  const ctx = c.getContext('2d');
+  ctx.scale(DPR, DPR);
+  return ctx;
+}
+
+let cardNum = 2; // 1 = zone map
+document.getElementById('zone-map-num').textContent = '1';
+function addCard(containerId, canvas, label, rarity) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  const num = document.createElement('div');
+  num.className = 'number';
+  num.textContent = cardNum++;
+  card.appendChild(num);
+  card.appendChild(canvas);
+  const lbl = document.createElement('div');
+  lbl.className = 'label';
+  lbl.textContent = label;
+  card.appendChild(lbl);
+  if (rarity) {
+    const r = document.createElement('div');
+    r.className = 'rarity rarity-' + rarity;
+    r.textContent = rarity.toUpperCase();
+    card.appendChild(r);
+  }
+  document.getElementById(containerId).appendChild(card);
+}
+
+// ============ ZONE MAP ============
+(function(){
+  const ctx = fixCanvas('zone-map', 400, 600);
+  // Background gradient
+  const g = ctx.createLinearGradient(0, 0, 0, 600);
+  g.addColorStop(0, '#87CEEB');  // sky
+  g.addColorStop(0.12, '#FFD54F'); // beach
+  g.addColorStop(0.18, '#00BCD4'); // coral reef
+  g.addColorStop(0.35, '#2E7D32'); // kelp forest
+  g.addColorStop(0.55, '#0D47A1'); // deep sea
+  g.addColorStop(0.75, '#050520'); // open ocean
+  g.addColorStop(1.0, '#020210');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 400, 600);
+
+  // Zone labels
+  const zones = [
+    { y: 35, name: 'AQUARIUM', color: '#FFD700', icon: '🏠' },
+    { y: 70, name: 'BEACH / SHOP', color: '#FFCA28', icon: '🏖️' },
+    { y: 130, name: 'CORAL REEF', color: '#00E5FF', icon: '🐠' },
+    { y: 210, name: 'KELP FOREST', color: '#66BB6A', icon: '🌿' },
+    { y: 320, name: 'DEEP SEA', color: '#42A5F5', icon: '🦑' },
+    { y: 440, name: 'OPEN OCEAN', color: '#7C4DFF', icon: '🐋' },
+    { y: 540, name: 'THE ABYSS', color: '#E040FB', icon: '👁️' },
+  ];
+
+  // Zone dividers and labels
+  zones.forEach((z, i) => {
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    if (i > 0) {
+      ctx.beginPath();
+      ctx.moveTo(0, z.y - 20);
+      for (let x = 0; x < 400; x += 8) {
+        ctx.lineTo(x, z.y - 20 + Math.sin(x * 0.08) * 5);
+      }
+      ctx.lineTo(400, z.y - 20);
+      ctx.lineTo(400, z.y - 15);
+      ctx.lineTo(0, z.y - 15);
+      ctx.fill();
+    }
+    ctx.fillStyle = z.color;
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(z.icon + ' ' + z.name, 20, z.y + 5);
+  });
+
+  // Staircase arrows
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++) {
+    const y = 150 + i * 100;
+    ctx.beginPath();
+    ctx.moveTo(200, y); ctx.lineTo(200, y + 30);
+    ctx.moveTo(195, y + 25); ctx.lineTo(200, y + 30); ctx.lineTo(205, y + 25);
+    ctx.stroke();
+  }
+
+  // Small aquarium building at top
+  ctx.fillStyle = '#E3F2FD';
+  ctx.fillRect(280, 15, 80, 45);
+  ctx.fillStyle = '#1565C0';
+  ctx.beginPath();
+  ctx.moveTo(275, 15); ctx.lineTo(320, 0); ctx.lineTo(365, 15); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#81D4FA';
+  ctx.fillRect(290, 30, 20, 15);
+  ctx.fillRect(340, 30, 20, 15);
+  ctx.fillStyle = '#0D47A1';
+  ctx.fillRect(315, 35, 15, 25);
+
+  // Ticket booth at bottom
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(300, 55, 60, 25);
+  ctx.fillStyle = '#FFD700';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('TICKETS', 330, 72);
+
+  // Cave entrance in deep
+  ctx.strokeStyle = '#7C4DFF';
+  ctx.lineWidth = 2;
+  for (let r = 8; r < 25; r += 5) {
+    ctx.beginPath(); ctx.arc(350, 350, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = '#7C4DFF';
+  ctx.font = '10px sans-serif';
+  ctx.fillText('CAVE', 350, 385);
+})();
+
+// ============ DRAW CREATURE FUNCTIONS ============
+
+// Simple tropical fish
+function drawTropicalFish(ctx, cx, cy, s, color1, color2) {
+  // Tail
+  ctx.fillStyle = color2;
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.4, cy);
+  ctx.lineTo(cx - s * 0.7, cy - s * 0.25);
+  ctx.lineTo(cx - s * 0.7, cy + s * 0.25);
+  ctx.closePath(); ctx.fill();
+  // Body
+  ctx.fillStyle = color1;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, s * 0.45, s * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Stripe
+  ctx.fillStyle = color2;
+  ctx.fillRect(cx - 2, cy - s * 0.25, 4, s * 0.5);
+  // Eye
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(cx + s * 0.2, cy - s * 0.05, s * 0.08, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'black';
+  ctx.beginPath(); ctx.arc(cx + s * 0.22, cy - s * 0.05, s * 0.04, 0, Math.PI * 2); ctx.fill();
+  // Top fin
+  ctx.fillStyle = color2;
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.1, cy - s * 0.28);
+  ctx.lineTo(cx + s * 0.05, cy - s * 0.5);
+  ctx.lineTo(cx + s * 0.15, cy - s * 0.25);
+  ctx.closePath(); ctx.fill();
+}
+
+// Jellyfish
+function drawJellyfish(ctx, cx, cy, s, color, glowColor) {
+  // Dome
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.7;
+  ctx.beginPath(); ctx.arc(cx, cy, s * 0.35, Math.PI, 0); ctx.fill();
+  ctx.globalAlpha = 1;
+  // Tentacles
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    const tx = cx - s * 0.25 + i * s * 0.12;
+    ctx.beginPath(); ctx.moveTo(tx, cy);
+    ctx.quadraticCurveTo(tx + Math.sin(i) * 5, cy + s * 0.3, tx - 3, cy + s * 0.5);
+    ctx.stroke();
+  }
+  // Eyes
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(cx - 5, cy - 5, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 5, cy - 5, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'black';
+  ctx.beginPath(); ctx.arc(cx - 4, cy - 5, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 6, cy - 5, 1.5, 0, Math.PI * 2); ctx.fill();
+}
+
+// Squid
+function drawSquid(ctx, cx, cy, s, color) {
+  // Body
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(cx, cy - s * 0.1, s * 0.2, s * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+  // Tentacles
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  for (let i = 0; i < 6; i++) {
+    const tx = cx - s * 0.15 + i * s * 0.06;
+    ctx.beginPath(); ctx.moveTo(tx, cy + s * 0.2);
+    ctx.quadraticCurveTo(tx + (i % 2 ? 5 : -5), cy + s * 0.4, tx + (i % 2 ? 8 : -8), cy + s * 0.5);
+    ctx.stroke();
+  }
+  // Eyes
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(cx - 4, cy - s * 0.1, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 4, cy - s * 0.1, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'black';
+  ctx.beginPath(); ctx.arc(cx - 3, cy - s * 0.1, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 5, cy - s * 0.1, 2, 0, Math.PI * 2); ctx.fill();
+}
+
+// Star creature
+function drawStarCreature(ctx, cx, cy, s, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI * 2) / 5;
+    const a2 = a + Math.PI / 5;
+    ctx.lineTo(cx + Math.cos(a) * s * 0.4, cy + Math.sin(a) * s * 0.4);
+    ctx.lineTo(cx + Math.cos(a2) * s * 0.15, cy + Math.sin(a2) * s * 0.15);
+  }
+  ctx.closePath(); ctx.fill();
+  // Face
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(cx - 4, cy - 2, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 4, cy - 2, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'black';
+  ctx.beginPath(); ctx.arc(cx - 3, cy - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 5, cy - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = color === '#E040FB' ? '#fff' : '#333';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy + 3, 3, 0.1, Math.PI - 0.1); ctx.stroke();
+}
+
+// Cluster ball creature
+function drawClusterBall(ctx, cx, cy, s, color) {
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const r = s * 0.2;
+    const bx = cx + Math.cos(a) * r;
+    const by = cy + Math.sin(a) * r;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.6 + Math.random() * 0.4;
+    ctx.beginPath(); ctx.arc(bx, by, s * 0.12, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(cx, cy, s * 0.15, 0, Math.PI * 2); ctx.fill();
+  // Eye in center
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'black';
+  ctx.beginPath(); ctx.arc(cx + 1, cy, 2, 0, Math.PI * 2); ctx.fill();
+}
+
+// Deep alien creature
+function drawDeepAlien(ctx, cx, cy, s, color) {
+  // Body (triangular/alien head)
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - s * 0.3);
+  ctx.lineTo(cx + s * 0.25, cy + s * 0.1);
+  ctx.lineTo(cx - s * 0.25, cy + s * 0.1);
+  ctx.closePath(); ctx.fill();
+  // Antennae
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx - 5, cy - s * 0.3);
+  ctx.quadraticCurveTo(cx - 12, cy - s * 0.5, cx - 8, cy - s * 0.55); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + 5, cy - s * 0.3);
+  ctx.quadraticCurveTo(cx + 12, cy - s * 0.5, cx + 8, cy - s * 0.55); ctx.stroke();
+  // Glowing tips
+  ctx.fillStyle = '#FFEB3B';
+  ctx.beginPath(); ctx.arc(cx - 8, cy - s * 0.55, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 8, cy - s * 0.55, 3, 0, Math.PI * 2); ctx.fill();
+  // Zigzag legs
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  for (let side = -1; side <= 1; side += 2) {
+    ctx.beginPath(); ctx.moveTo(cx + side * 8, cy + s * 0.1);
+    ctx.lineTo(cx + side * 12, cy + s * 0.2);
+    ctx.lineTo(cx + side * 8, cy + s * 0.3);
+    ctx.lineTo(cx + side * 14, cy + s * 0.4);
+    ctx.stroke();
+  }
+  // Big eyes
+  ctx.fillStyle = '#FFEB3B';
+  ctx.beginPath(); ctx.arc(cx - 6, cy - s * 0.1, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 6, cy - s * 0.1, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(cx - 5, cy - s * 0.1, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 7, cy - s * 0.1, 2.5, 0, Math.PI * 2); ctx.fill();
+}
+
+// Spiky pufferfish (covered in eyes)
+function drawSpikyPuffer(ctx, cx, cy, s, color) {
+  // Spikes radiating out
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * s * 0.3, cy + Math.sin(a) * s * 0.3);
+    ctx.lineTo(cx + Math.cos(a) * s * 0.5, cy + Math.sin(a) * s * 0.5);
+    ctx.stroke();
+  }
+  // Body
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(cx, cy, s * 0.3, 0, Math.PI * 2); ctx.fill();
+  // Multiple eyes
+  const eyePositions = [[-6,-6],[6,-6],[0,2],[-8,4],[8,4]];
+  eyePositions.forEach(([ex, ey]) => {
+    ctx.fillStyle = 'white';
+    ctx.beginPath(); ctx.arc(cx + ex, cy + ey, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(cx + ex + 0.5, cy + ey, 1.8, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+// Fan-tentacle boss
+function drawFanBoss(ctx, cx, cy, s, color, glowColor) {
+  const tentacleCount = Math.floor(8 + s * 0.1);
+  const fanSpread = Math.PI * 0.85;
+  // Tentacles
+  for (let i = 0; i < tentacleCount; i++) {
+    const frac = i / (tentacleCount - 1);
+    const a = -fanSpread / 2 + frac * fanSpread + Math.PI / 2;
+    const len = s * 1.2 * (0.85 + Math.sin(frac * Math.PI) * 0.3);
+    ctx.strokeStyle = color; ctx.lineWidth = 2 + (1 - Math.abs(frac - 0.5) * 2);
+    ctx.lineCap = 'round';
+    const ex = Math.cos(a) * len;
+    const ey = Math.sin(a) * len;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + s * 0.15);
+    ctx.quadraticCurveTo(cx + ex * 0.5 + Math.sin(a) * 10, cy + s * 0.15 + ey * 0.5, cx + ex, cy + s * 0.15 + ey);
+    ctx.stroke();
+  }
+  // Body (square with rounded corners)
+  const bw = s * 0.5, bh = s * 0.4;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.roundRect(cx - bw/2, cy - bh/2, bw, bh, 5); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+  // Curly antennae
+  for (let side = -1; side <= 1; side += 2) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx + side * 5, cy - bh/2);
+    ctx.quadraticCurveTo(cx + side * 12, cy - bh/2 - 12, cx + side * 8, cy - bh/2 - 20);
+    ctx.stroke();
+    ctx.fillStyle = glowColor;
+    ctx.beginPath(); ctx.arc(cx + side * 8, cy - bh/2 - 20, 3, 0, Math.PI * 2); ctx.fill();
+  }
+  // Eyes
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(cx - 6, cy - 2, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 6, cy - 2, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 7, cy - 2, 2, 0, Math.PI * 2); ctx.fill();
+  // Mouth
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx, cy + 6, 4, 0.2, Math.PI - 0.2); ctx.stroke();
+}
+
+// Lorian sea dragon boss
+function drawLorian(ctx, cx, cy, s, color) {
+  // Crown spines
+  ctx.fillStyle = color;
+  for (let i = 0; i < 5; i++) {
+    const sx = cx - 12 + i * 6;
+    ctx.beginPath();
+    ctx.moveTo(sx - 3, cy - s * 0.3);
+    ctx.lineTo(sx, cy - s * 0.3 - 12 - Math.sin(i) * 4);
+    ctx.lineTo(sx + 3, cy - s * 0.3);
+    ctx.fill();
+  }
+  // Head
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - s * 0.15, s * 0.25, s * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Body (elongated)
+  ctx.beginPath();
+  ctx.ellipse(cx + s * 0.3, cy + s * 0.1, s * 0.5, s * 0.15, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  // Tail spines
+  for (let i = 0; i < 4; i++) {
+    const tx = cx + s * 0.5 + i * 8;
+    ctx.beginPath();
+    ctx.moveTo(tx, cy + s * 0.05 - 5);
+    ctx.lineTo(tx + 4, cy + s * 0.05 - 15);
+    ctx.lineTo(tx + 8, cy + s * 0.05 - 5);
+    ctx.fill();
+  }
+  // Tail fin
+  ctx.beginPath();
+  ctx.moveTo(cx + s * 0.75, cy + s * 0.1);
+  ctx.lineTo(cx + s * 0.95, cy - s * 0.05);
+  ctx.lineTo(cx + s * 0.95, cy + s * 0.25);
+  ctx.closePath(); ctx.fill();
+  // Eye
+  ctx.fillStyle = '#FFEB3B';
+  ctx.beginPath(); ctx.arc(cx + 5, cy - s * 0.18, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(cx + 6, cy - s * 0.18, 2.5, 0, Math.PI * 2); ctx.fill();
+  // Teeth
+  ctx.fillStyle = 'white';
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx - 8 + i * 5, cy);
+    ctx.lineTo(cx - 6 + i * 5, cy + 6);
+    ctx.lineTo(cx - 4 + i * 5, cy);
+    ctx.fill();
+  }
+  // Claws
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx - s * 0.1, cy + s * 0.05);
+  ctx.lineTo(cx - s * 0.15, cy + s * 0.25); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + s * 0.1, cy + s * 0.15);
+  ctx.lineTo(cx + s * 0.05, cy + s * 0.3); ctx.stroke();
+}
+
+// Manta ray
+function drawManta(ctx, cx, cy, s, color) {
+  ctx.fillStyle = color;
+  // Wings
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.quadraticCurveTo(cx - s * 0.6, cy - s * 0.15, cx - s * 0.7, cy + s * 0.1);
+  ctx.quadraticCurveTo(cx - s * 0.4, cy + s * 0.05, cx, cy + s * 0.05);
+  ctx.quadraticCurveTo(cx + s * 0.4, cy + s * 0.05, cx + s * 0.7, cy + s * 0.1);
+  ctx.quadraticCurveTo(cx + s * 0.6, cy - s * 0.15, cx, cy);
+  ctx.fill();
+  // Tail
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx, cy + s * 0.05);
+  ctx.lineTo(cx, cy + s * 0.35); ctx.stroke();
+  // Eyes
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(cx - s * 0.12, cy - 2, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + s * 0.12, cy - 2, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(cx - s * 0.11, cy - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + s * 0.13, cy - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+  // Belly
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.beginPath(); ctx.ellipse(cx, cy + 2, s * 0.15, s * 0.03, 0, 0, Math.PI * 2); ctx.fill();
+}
+
+// Swordfish
+function drawSwordfish(ctx, cx, cy, s, color) {
+  ctx.fillStyle = color;
+  // Body
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, s * 0.35, s * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Sword
+  ctx.strokeStyle = color; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx + s * 0.35, cy);
+  ctx.lineTo(cx + s * 0.8, cy); ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx + s * 0.8, cy);
+  ctx.lineTo(cx + s * 0.9, cy); ctx.stroke();
+  // Tail
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.35, cy);
+  ctx.lineTo(cx - s * 0.55, cy - s * 0.2);
+  ctx.lineTo(cx - s * 0.55, cy + s * 0.2);
+  ctx.closePath(); ctx.fill();
+  // Dorsal fin
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.05, cy - s * 0.15);
+  ctx.lineTo(cx + s * 0.05, cy - s * 0.35);
+  ctx.lineTo(cx + s * 0.15, cy - s * 0.12);
+  ctx.closePath(); ctx.fill();
+  // Eye
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(cx + s * 0.15, cy - 2, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(cx + s * 0.16, cy - 2, 2, 0, Math.PI * 2); ctx.fill();
+}
+
+// Character drawing
+function drawCharacter(ctx, cx, cy, s, pose, expression) {
+  // Head
+  ctx.fillStyle = '#FFB74D';
+  ctx.beginPath(); ctx.arc(cx, cy - s * 0.35, s * 0.22, 0, Math.PI * 2); ctx.fill();
+  // Hair
+  ctx.fillStyle = '#5D4037';
+  ctx.beginPath(); ctx.arc(cx, cy - s * 0.42, s * 0.2, Math.PI, Math.PI * 2); ctx.fill();
+  // Flowing hair strands
+  if (pose === 'swim' || pose === 'fight' || pose === 'suffocate') {
+    ctx.strokeStyle = '#5D4037'; ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.moveTo(cx - s * 0.1, cy - s * 0.35 - 5);
+      ctx.quadraticCurveTo(cx - s * 0.25 - i * 3, cy - s * 0.4, cx - s * 0.3 - i * 5, cy - s * 0.3 + i * 3);
+      ctx.stroke();
+    }
+  }
+  // Scuba helmet
+  ctx.strokeStyle = '#263238'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy - s * 0.35, s * 0.24, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = 'rgba(129,212,250,0.3)';
+  ctx.beginPath(); ctx.arc(cx, cy - s * 0.35, s * 0.24, 0, Math.PI * 2); ctx.fill();
+
+  // Eyes based on expression
+  if (expression === 'normal') {
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(cx - 4, cy - s * 0.37, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 4, cy - s * 0.37, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy - s * 0.3, 3, 0.1, Math.PI - 0.1); ctx.stroke();
+  } else if (expression === 'panic') {
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(cx - 4, cy - s * 0.37, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 4, cy - s * 0.37, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy - s * 0.28, 4, 5, 0, 0, Math.PI * 2); ctx.stroke();
+  } else if (expression === 'dead') {
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+    [-4, 4].forEach(ex => {
+      ctx.beginPath(); ctx.moveTo(cx + ex - 3, cy - s * 0.4); ctx.lineTo(cx + ex + 3, cy - s * 0.34); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + ex + 3, cy - s * 0.4); ctx.lineTo(cx + ex - 3, cy - s * 0.34); ctx.stroke();
+    });
+    ctx.beginPath(); ctx.arc(cx, cy - s * 0.28, 3, 0.1, Math.PI - 0.1); ctx.stroke();
+  } else if (expression === 'angry') {
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(cx - 4, cy - s * 0.36, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 4, cy - s * 0.36, 2, 0, Math.PI * 2); ctx.fill();
+    // Angry eyebrows
+    ctx.strokeStyle = '#5D4037'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - 8, cy - s * 0.42); ctx.lineTo(cx - 2, cy - s * 0.4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 8, cy - s * 0.42); ctx.lineTo(cx + 2, cy - s * 0.4); ctx.stroke();
+  }
+
+  // Body
+  ctx.fillStyle = '#42A5F5';
+  if (pose === 'swim') {
+    // Horizontal swimming
+    ctx.beginPath(); ctx.roundRect(cx - s * 0.05, cy - s * 0.15, s * 0.5, s * 0.18, 4); ctx.fill();
+    // Arms forward
+    ctx.fillStyle = '#FFB74D';
+    ctx.beginPath(); ctx.roundRect(cx + s * 0.4, cy - s * 0.14, s * 0.2, 5, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(cx + s * 0.4, cy - s * 0.05, s * 0.18, 5, 2); ctx.fill();
+    // Legs + flippers
+    ctx.fillStyle = '#5D4037';
+    ctx.beginPath(); ctx.roundRect(cx - s * 0.2, cy, s * 0.18, 5, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(cx - s * 0.22, cy + 8, s * 0.18, 5, 2); ctx.fill();
+    ctx.fillStyle = '#1565C0';
+    ctx.beginPath(); ctx.ellipse(cx - s * 0.25, cy + 2, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx - s * 0.27, cy + 10, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+  } else if (pose === 'fight') {
+    ctx.beginPath(); ctx.roundRect(cx - s * 0.1, cy - s * 0.12, s * 0.2, s * 0.35, 4); ctx.fill();
+    // Arms up in fighting pose
+    ctx.fillStyle = '#FFB74D';
+    ctx.strokeStyle = '#FFB74D'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(cx + s * 0.1, cy - s * 0.05);
+    ctx.lineTo(cx + s * 0.3, cy - s * 0.2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - s * 0.1, cy - s * 0.05);
+    ctx.lineTo(cx - s * 0.25, cy + s * 0.05); ctx.stroke();
+    // Net/weapon
+    ctx.strokeStyle = '#8D6E63'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx + s * 0.3, cy - s * 0.2);
+    ctx.lineTo(cx + s * 0.5, cy - s * 0.35); ctx.stroke();
+    // Legs
+    ctx.fillStyle = '#5D4037';
+    ctx.fillRect(cx - 6, cy + s * 0.2, 5, 12);
+    ctx.fillRect(cx + 2, cy + s * 0.2, 5, 12);
+  } else if (pose === 'suffocate') {
+    ctx.beginPath(); ctx.roundRect(cx - s * 0.1, cy - s * 0.12, s * 0.2, s * 0.35, 4); ctx.fill();
+    // Arms reaching up
+    ctx.fillStyle = '#FFB74D'; ctx.strokeStyle = '#FFB74D'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(cx - s * 0.1, cy - s * 0.05);
+    ctx.lineTo(cx - s * 0.2, cy - s * 0.25); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + s * 0.1, cy - s * 0.05);
+    ctx.lineTo(cx + s * 0.2, cy - s * 0.25); ctx.stroke();
+    // Bubbles escaping
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath(); ctx.arc(cx + 15, cy - s * 0.45, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 20, cy - s * 0.55, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 18, cy - s * 0.65, 4, 0, Math.PI * 2); ctx.fill();
+    // Legs
+    ctx.fillStyle = '#5D4037';
+    ctx.fillRect(cx - 6, cy + s * 0.2, 5, 12);
+    ctx.fillRect(cx + 2, cy + s * 0.2, 5, 12);
+  } else {
+    // Standing (default)
+    ctx.beginPath(); ctx.roundRect(cx - s * 0.12, cy - s * 0.12, s * 0.24, s * 0.35, 4); ctx.fill();
+    ctx.fillStyle = '#5D4037';
+    ctx.fillRect(cx - 6, cy + s * 0.2, 5, 12);
+    ctx.fillRect(cx + 2, cy + s * 0.2, 5, 12);
+  }
+}
+
+// Deep Beast (IMG_1117 left - spiky monster with crown, claws, spots)
+function drawDeepBeast(ctx, cx, cy, s, bodyColor, spikeColor, eyeColor) {
+  // Legs / claws
+  ctx.strokeStyle = spikeColor || bodyColor;
+  ctx.lineWidth = 2.5;
+  for (let side = -1; side <= 1; side += 2) {
+    ctx.beginPath();
+    ctx.moveTo(cx + side * s * 0.2, cy + s * 0.2);
+    ctx.lineTo(cx + side * s * 0.35, cy + s * 0.4);
+    ctx.lineTo(cx + side * s * 0.3, cy + s * 0.42);
+    ctx.lineTo(cx + side * s * 0.38, cy + s * 0.45);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + side * s * 0.1, cy + s * 0.25);
+    ctx.lineTo(cx + side * s * 0.22, cy + s * 0.45);
+    ctx.lineTo(cx + side * s * 0.18, cy + s * 0.47);
+    ctx.lineTo(cx + side * s * 0.26, cy + s * 0.5);
+    ctx.stroke();
+  }
+  // Body
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, s * 0.35, s * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Belly spots
+  ctx.fillStyle = spikeColor || 'rgba(255,255,255,0.15)';
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.12 + i * s * 0.06, cy + s * 0.05 + Math.sin(i * 1.3) * s * 0.06, s * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Dorsal spikes (zigzag crown)
+  ctx.fillStyle = spikeColor || bodyColor;
+  for (let i = 0; i < 7; i++) {
+    const spx = cx - s * 0.25 + i * s * 0.08;
+    const spikeH = s * 0.12 + Math.sin(i * 0.9) * s * 0.03;
+    ctx.beginPath();
+    ctx.moveTo(spx - s * 0.03, cy - s * 0.25);
+    ctx.lineTo(spx, cy - s * 0.25 - spikeH);
+    ctx.lineTo(spx + s * 0.03, cy - s * 0.25);
+    ctx.closePath(); ctx.fill();
+  }
+  // Head / snout
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.ellipse(cx + s * 0.3, cy - s * 0.02, s * 0.12, s * 0.15, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye
+  ctx.fillStyle = eyeColor || '#FFEB3B';
+  ctx.beginPath(); ctx.arc(cx + s * 0.22, cy - s * 0.1, s * 0.07, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(cx + s * 0.24, cy - s * 0.1, s * 0.035, 0, Math.PI * 2); ctx.fill();
+  // Angry brow
+  ctx.strokeStyle = bodyColor; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(cx + s * 0.15, cy - s * 0.18); ctx.lineTo(cx + s * 0.28, cy - s * 0.15); ctx.stroke();
+  // Teeth
+  ctx.fillStyle = '#FFF';
+  for (let i = 0; i < 3; i++) {
+    const tx = cx + s * 0.32 + i * s * 0.03;
+    ctx.beginPath();
+    ctx.moveTo(tx, cy + s * 0.04);
+    ctx.lineTo(tx + s * 0.015, cy + s * 0.1);
+    ctx.lineTo(tx - s * 0.015, cy + s * 0.1);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+// Sea Dragon / Lorian (IMG_1117 right, IMG_1118)
+function drawSeaDragonCatalog(ctx, cx, cy, s, bodyColor, accentColor, crownColor) {
+  // Body segments
+  ctx.fillStyle = bodyColor;
+  for (let i = 0; i < 5; i++) {
+    const segX = cx - s * 0.15 - i * s * 0.14;
+    const segR = s * (0.14 - i * 0.015);
+    ctx.beginPath();
+    ctx.ellipse(segX, cy, segR, segR * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Tail fin
+  const tailX = cx - s * 0.15 - 5 * s * 0.14;
+  ctx.fillStyle = accentColor || bodyColor;
+  ctx.beginPath();
+  ctx.moveTo(tailX, cy);
+  ctx.lineTo(tailX - s * 0.15, cy - s * 0.12);
+  ctx.lineTo(tailX - s * 0.12, cy);
+  ctx.lineTo(tailX - s * 0.18, cy + s * 0.1);
+  ctx.closePath(); ctx.fill();
+  // Head
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.ellipse(cx + s * 0.12, cy, s * 0.2, s * 0.16, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  // Snout
+  ctx.beginPath();
+  ctx.ellipse(cx + s * 0.32, cy + s * 0.02, s * 0.1, s * 0.07, 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  // Crown spines
+  ctx.fillStyle = crownColor || accentColor || bodyColor;
+  for (let i = 0; i < 5; i++) {
+    const spx = cx + s * 0.02 + i * s * 0.05;
+    const spikeH = s * 0.18 + Math.sin(i * 1.2) * s * 0.05;
+    ctx.beginPath();
+    ctx.moveTo(spx - s * 0.02, cy - s * 0.14);
+    ctx.lineTo(spx + s * 0.005, cy - s * 0.14 - spikeH);
+    ctx.lineTo(spx + s * 0.02, cy - s * 0.14);
+    ctx.closePath(); ctx.fill();
+  }
+  // Flowing tendrils
+  ctx.strokeStyle = accentColor || bodyColor;
+  ctx.lineWidth = 1.5; ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 4; i++) {
+    const bx = cx - s * 0.1 + i * s * 0.12;
+    ctx.beginPath();
+    ctx.moveTo(bx, cy + s * 0.1);
+    ctx.quadraticCurveTo(bx + (i % 2 ? 6 : -6), cy + s * 0.25, bx + (i % 2 ? 4 : -4), cy + s * 0.4);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // Eye
+  ctx.fillStyle = '#FFF';
+  ctx.beginPath(); ctx.arc(cx + s * 0.2, cy - s * 0.04, s * 0.06, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = crownColor || '#FFD600';
+  ctx.beginPath(); ctx.arc(cx + s * 0.2, cy - s * 0.04, s * 0.04, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(cx + s * 0.21, cy - s * 0.04, s * 0.02, 0, Math.PI * 2); ctx.fill();
+  // Teeth
+  ctx.fillStyle = '#FFF';
+  for (let i = 0; i < 3; i++) {
+    const tx = cx + s * 0.3 + i * s * 0.025;
+    ctx.beginPath();
+    ctx.moveTo(tx, cy + s * 0.06);
+    ctx.lineTo(tx + s * 0.01, cy + s * 0.1);
+    ctx.lineTo(tx - s * 0.01, cy + s * 0.1);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+// Abyssal Eye (IMG_1122 - massive spiky eye creature)
+function drawAbyssalEye(ctx, cx, cy, s, bodyColor, spikeColor, eyeColor) {
+  const r = s * 0.4;
+  // Glow aura
+  ctx.fillStyle = eyeColor || '#FFEB3B';
+  ctx.globalAlpha = 0.1;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+  // Dense spikes
+  ctx.strokeStyle = spikeColor || bodyColor;
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    const spikeLen = s * 0.12 + Math.sin(i * 0.8) * s * 0.06;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    ctx.lineTo(cx + Math.cos(a) * (r + spikeLen), cy + Math.sin(a) * (r + spikeLen));
+    ctx.stroke();
+    // Spike tip dots
+    ctx.fillStyle = eyeColor || '#FFEB3B';
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * (r + spikeLen), cy + Math.sin(a) * (r + spikeLen), 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // Crown / triple horns
+  ctx.fillStyle = spikeColor || bodyColor;
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.06, cy - r); ctx.lineTo(cx, cy - r - s * 0.2); ctx.lineTo(cx + s * 0.06, cy - r);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.12, cy - r + s * 0.04); ctx.lineTo(cx - s * 0.18, cy - r - s * 0.1); ctx.lineTo(cx - s * 0.06, cy - r + s * 0.02);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + s * 0.12, cy - r + s * 0.04); ctx.lineTo(cx + s * 0.18, cy - r - s * 0.1); ctx.lineTo(cx + s * 0.06, cy - r + s * 0.02);
+  ctx.closePath(); ctx.fill();
+  // Body
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  // Giant central eye
+  const bigR = s * 0.2;
+  ctx.fillStyle = '#FFF';
+  ctx.beginPath(); ctx.ellipse(cx, cy, bigR, bigR * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = eyeColor || '#FFEB3B';
+  ctx.beginPath(); ctx.arc(cx, cy, bigR * 0.55, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.ellipse(cx, cy, bigR * 0.15, bigR * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+  // Surrounding smaller eyes
+  const smallEyes = [
+    [-s*0.2, -s*0.15, s*0.045], [s*0.2, -s*0.13, s*0.04],
+    [-s*0.25, s*0.05, s*0.035], [s*0.24, s*0.08, s*0.04],
+    [-s*0.12, s*0.2, s*0.035], [s*0.1, s*0.22, s*0.03],
+    [-s*0.05, -s*0.25, s*0.03], [s*0.08, -s*0.24, s*0.03],
+  ];
+  smallEyes.forEach(([ex, ey, er]) => {
+    ctx.fillStyle = '#FFF';
+    ctx.beginPath(); ctx.arc(cx + ex, cy + ey, er, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = eyeColor || '#FFEB3B';
+    ctx.beginPath(); ctx.arc(cx + ex, cy + ey, er * 0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(cx + ex, cy + ey, er * 0.25, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+// ============ POPULATE CARDS ============
+
+// COMMON creatures
+[
+  { name: 'Tropical Fish', draw: (ctx, s) => drawTropicalFish(ctx, 50, 45, 35, '#FF6F00', '#FFF'), color: '#FF6F00' },
+  { name: 'Small Jellyfish', draw: (ctx, s) => drawJellyfish(ctx, 50, 40, 30, '#CE93D8', '#E040FB') },
+  { name: 'Baby Squid', draw: (ctx, s) => drawSquid(ctx, 50, 40, 25, '#78909C') },
+  { name: 'Sun Bass', draw: (ctx, s) => drawTropicalFish(ctx, 50, 45, 30, '#FFD600', '#FF8F00') },
+  { name: 'Reef Fish', draw: (ctx, s) => drawTropicalFish(ctx, 50, 45, 28, '#00E676', '#004D40') },
+].forEach(item => {
+  const { c, ctx } = makeCanvas(100, 90);
+  const bg = ctx.createLinearGradient(0, 0, 0, 90);
+  bg.addColorStop(0, '#0a2a4a'); bg.addColorStop(1, '#051530');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 100, 90);
+  item.draw(ctx);
+  addCard('common-row', c, item.name, 'common');
+});
+
+// UNCOMMON
+[
+  { name: 'Star Creature', draw: (ctx) => drawStarCreature(ctx, 50, 45, 35, '#66BB6A') },
+  { name: 'Striped Fish', draw: (ctx) => drawTropicalFish(ctx, 50, 45, 35, '#42A5F5', '#E3F2FD') },
+  { name: 'Flower Jelly', draw: (ctx) => { drawJellyfish(ctx, 50, 35, 35, '#F48FB1', '#E91E63'); } },
+  { name: 'Kelp Squid', draw: (ctx) => drawSquid(ctx, 50, 40, 30, '#2E7D32') },
+].forEach(item => {
+  const { c, ctx } = makeCanvas(100, 90);
+  const bg = ctx.createLinearGradient(0, 0, 0, 90);
+  bg.addColorStop(0, '#0a2a3a'); bg.addColorStop(1, '#051520');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 100, 90);
+  item.draw(ctx);
+  addCard('uncommon-row', c, item.name, 'uncommon');
+});
+
+// RARE
+[
+  { name: 'Cluster Ball', draw: (ctx) => drawClusterBall(ctx, 50, 45, 35, '#E040FB') },
+  { name: 'Deep Alien', draw: (ctx) => drawDeepAlien(ctx, 50, 50, 40, '#4FC3F7') },
+  { name: 'Ghost Jelly', draw: (ctx) => drawJellyfish(ctx, 50, 35, 40, 'rgba(200,200,255,0.5)', '#fff') },
+  { name: 'Manta Ray', draw: (ctx) => drawManta(ctx, 50, 45, 40, '#546E7A') },
+].forEach(item => {
+  const { c, ctx } = makeCanvas(100, 90);
+  const bg = ctx.createLinearGradient(0, 0, 0, 90);
+  bg.addColorStop(0, '#0a1030'); bg.addColorStop(1, '#050818');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 100, 90);
+  item.draw(ctx);
+  addCard('rare-row', c, item.name, 'rare');
+});
+
+// LEGENDARY
+[
+  { name: 'Spiky Puffer', draw: (ctx) => drawSpikyPuffer(ctx, 60, 50, 40, '#D50000') },
+  { name: 'Fan Boss (S)', draw: (ctx) => drawFanBoss(ctx, 60, 35, 18, '#4FC3F7', 'rgba(79,195,247,0.8)') },
+  { name: 'Swordfish', draw: (ctx) => drawSwordfish(ctx, 60, 50, 50, '#1565C0') },
+].forEach(item => {
+  const { c, ctx } = makeCanvas(120, 100);
+  const bg = ctx.createLinearGradient(0, 0, 0, 100);
+  bg.addColorStop(0, '#0a0a20'); bg.addColorStop(1, '#030310');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 120, 100);
+  item.draw(ctx);
+  addCard('legendary-row', c, item.name, 'legendary');
+});
+
+// MEGA RARE
+[
+  { name: 'Deep Star', draw: (ctx) => drawStarCreature(ctx, 60, 50, 50, '#E040FB') },
+  { name: 'Abyss Cluster', draw: (ctx) => drawClusterBall(ctx, 60, 50, 50, '#7C4DFF') },
+].forEach(item => {
+  const { c, ctx } = makeCanvas(120, 100);
+  const bg = ctx.createRadialGradient(60, 50, 0, 60, 50, 60);
+  bg.addColorStop(0, '#1a0030'); bg.addColorStop(1, '#050010');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 120, 100);
+  item.draw(ctx);
+  addCard('megarare-row', c, item.name, 'megarare');
+});
+
+// ============ BOSSES ============
+[
+  { name: 'Fan Boss (Blue)', w: 160, h: 180, draw: (ctx) => {
+    const bg = ctx.createLinearGradient(0, 0, 0, 180);
+    bg.addColorStop(0, '#0a1a3a'); bg.addColorStop(1, '#050c20');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 160, 180);
+    drawFanBoss(ctx, 80, 60, 28, '#4FC3F7', 'rgba(79,195,247,0.8)');
+  }},
+  { name: 'Fan Boss (Purple)', w: 180, h: 200, draw: (ctx) => {
+    const bg = ctx.createLinearGradient(0, 0, 0, 200);
+    bg.addColorStop(0, '#0a0a2a'); bg.addColorStop(1, '#050510');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 180, 200);
+    drawFanBoss(ctx, 90, 65, 35, '#CE93D8', 'rgba(206,147,216,0.8)');
+  }},
+  { name: 'Fan Boss (Dark)', w: 200, h: 220, draw: (ctx) => {
+    const bg = ctx.createLinearGradient(0, 0, 0, 220);
+    bg.addColorStop(0, '#080808'); bg.addColorStop(1, '#030308');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 200, 220);
+    drawFanBoss(ctx, 100, 70, 42, '#37474F', 'rgba(100,120,140,0.6)');
+  }},
+  { name: 'Lorian (Sea Dragon)', w: 200, h: 140, draw: (ctx) => {
+    const bg = ctx.createLinearGradient(0, 0, 0, 140);
+    bg.addColorStop(0, '#0a2a1a'); bg.addColorStop(1, '#050c08');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 200, 140);
+    drawLorian(ctx, 60, 75, 50, '#2E7D32');
+  }},
+  { name: 'Deep Beast', w: 180, h: 140, draw: (ctx) => {
+    const bg = ctx.createLinearGradient(0, 0, 0, 140);
+    bg.addColorStop(0, '#0a0a1a'); bg.addColorStop(1, '#030308');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 180, 140);
+    drawDeepBeast(ctx, 80, 65, 48, '#37474F', '#546E7A', '#76FF03');
+  }},
+  { name: 'Crimson Beast', w: 180, h: 140, draw: (ctx) => {
+    const bg = ctx.createLinearGradient(0, 0, 0, 140);
+    bg.addColorStop(0, '#1a0808'); bg.addColorStop(1, '#0a0305');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 180, 140);
+    drawDeepBeast(ctx, 80, 65, 48, '#B71C1C', '#D32F2F', '#FFEB3B');
+  }},
+  { name: 'Frost Lorian', w: 200, h: 140, draw: (ctx) => {
+    const bg = ctx.createLinearGradient(0, 0, 0, 140);
+    bg.addColorStop(0, '#0a1a2a'); bg.addColorStop(1, '#050810');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 200, 140);
+    drawSeaDragonCatalog(ctx, 70, 75, 50, '#4FC3F7', '#B3E5FC', '#E040FB');
+  }},
+  { name: 'Abyssal Eye', w: 180, h: 180, draw: (ctx) => {
+    const bg = ctx.createRadialGradient(90, 90, 0, 90, 90, 90);
+    bg.addColorStop(0, '#1a0030'); bg.addColorStop(1, '#050010');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 180, 180);
+    drawAbyssalEye(ctx, 90, 90, 55, '#4A148C', '#7B1FA2', '#FFEB3B');
+  }},
+  { name: 'Blood Eye', w: 180, h: 180, draw: (ctx) => {
+    const bg = ctx.createRadialGradient(90, 90, 0, 90, 90, 90);
+    bg.addColorStop(0, '#1a0505'); bg.addColorStop(1, '#080202');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, 180, 180);
+    drawAbyssalEye(ctx, 90, 90, 55, '#B71C1C', '#D50000', '#76FF03');
+  }},
+].forEach(item => {
+  const { c, ctx } = makeCanvas(item.w, item.h);
+  item.draw(ctx);
+  addCard('boss-row', c, item.name);
+});
+
+// ============ CHARACTERS ============
+[
+  { name: 'Swimming', pose: 'swim', expr: 'normal' },
+  { name: 'Fighting', pose: 'fight', expr: 'angry' },
+  { name: 'Running Out of Air', pose: 'suffocate', expr: 'panic' },
+  { name: 'Suffocating', pose: 'suffocate', expr: 'dead' },
+  { name: 'Standing (Beach)', pose: 'stand', expr: 'normal' },
+].forEach(item => {
+  const { c, ctx } = makeCanvas(120, 120);
+  const bg = ctx.createLinearGradient(0, 0, 0, 120);
+  bg.addColorStop(0, '#0a2a4a'); bg.addColorStop(1, '#051530');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 120, 120);
+  drawCharacter(ctx, 60, 70, 50, item.pose, item.expr);
+  addCard('char-row', c, item.name);
+});
+
+// ============ ENVIRONMENT ============
+function drawKelp(ctx, x, y, h, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.quadraticCurveTo(x + 8, y - h * 0.5, x - 3, y - h); ctx.stroke();
+  // Leaves
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(x + 6, y - h * 0.3, 8, 3, 0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x - 4, y - h * 0.6, 7, 3, -0.4, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawBullKelp(ctx, x, y, h, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h + 10); ctx.stroke();
+  // Bulb
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(x, y - h + 10, 6, 0, Math.PI * 2); ctx.fill();
+  // Fronds
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath(); ctx.moveTo(x, y - h + 10);
+    ctx.quadraticCurveTo(x + 10 + i * 3, y - h - 5, x + 15 + i * 5, y - h + 5 + i * 3);
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+function drawPipeCoral(ctx, x, y, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 3;
+  // Branching segments
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 20); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(x - 10, y - 22); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(x + 12, y - 25); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + 12, y - 25); ctx.lineTo(x + 8, y - 35); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + 12, y - 25); ctx.lineTo(x + 20, y - 32); ctx.stroke();
+  // Dots on segments
+  ctx.fillStyle = color;
+  [[-10,-22],[0,-20],[12,-25],[8,-35],[20,-32]].forEach(([dx,dy]) => {
+    ctx.beginPath(); ctx.arc(x+dx, y+dy, 2, 0, Math.PI*2); ctx.fill();
+  });
+}
+
+function drawSeaAnemone(ctx, x, y, color) {
+  // Base
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(x, y, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
+  // Tentacles waving up
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  for (let i = 0; i < 7; i++) {
+    const tx = x - 10 + i * 3.3;
+    ctx.beginPath(); ctx.moveTo(tx, y - 4);
+    ctx.quadraticCurveTo(tx + (i % 2 ? 4 : -4), y - 18, tx + (i % 2 ? 2 : -2), y - 28);
+    ctx.stroke();
+  }
+}
+
+[
+  { name: 'Kelp / Seaweed', draw: (ctx) => {
+    drawKelp(ctx, 25, 85, 60, '#2E7D32');
+    drawKelp(ctx, 50, 85, 50, '#388E3C');
+    drawKelp(ctx, 72, 85, 55, '#1B5E20');
+  }},
+  { name: 'Bull Kelp', draw: (ctx) => {
+    drawBullKelp(ctx, 30, 85, 65, '#33691E');
+    drawBullKelp(ctx, 65, 85, 55, '#558B2F');
+  }},
+  { name: 'Pipe Coral', draw: (ctx) => {
+    drawPipeCoral(ctx, 30, 80, '#F48FB1');
+    drawPipeCoral(ctx, 65, 80, '#CE93D8');
+  }},
+  { name: 'Sea Anemone', draw: (ctx) => {
+    drawSeaAnemone(ctx, 30, 75, '#E91E63');
+    drawSeaAnemone(ctx, 70, 75, '#FF6F00');
+  }},
+  { name: 'Coral Reef', draw: (ctx) => {
+    // Branching coral
+    ctx.fillStyle = '#F48FB1';
+    for (let i = 0; i < 3; i++) {
+      const bx = 20 + i * 25;
+      ctx.beginPath(); ctx.moveTo(bx, 85);
+      ctx.quadraticCurveTo(bx + 3, 60, bx + 8, 50);
+      ctx.quadraticCurveTo(bx + 15, 55, bx + 10, 85);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#FFB74D';
+    ctx.beginPath(); ctx.ellipse(50, 78, 18, 10, 0, Math.PI, 0); ctx.fill();
+  }},
+  { name: 'Cave Entrance', draw: (ctx) => {
+    ctx.strokeStyle = '#7C4DFF'; ctx.lineWidth = 2;
+    for (let r = 6; r < 30; r += 5) {
+      ctx.beginPath(); ctx.arc(50, 50, r, 0, Math.PI * 2); ctx.stroke();
+    }
+    // Spikes around
+    ctx.fillStyle = '#37474F';
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(50 + Math.cos(a) * 28, 50 + Math.sin(a) * 28);
+      ctx.lineTo(50 + Math.cos(a) * 38, 50 + Math.sin(a) * 38);
+      ctx.lineTo(50 + Math.cos(a + 0.3) * 28, 50 + Math.sin(a + 0.3) * 28);
+      ctx.fill();
+    }
+  }},
+].forEach(item => {
+  const { c, ctx } = makeCanvas(100, 90);
+  const bg = ctx.createLinearGradient(0, 0, 0, 90);
+  bg.addColorStop(0, '#0a1a3a'); bg.addColorStop(1, '#051020');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 100, 90);
+  item.draw(ctx);
+  addCard('env-row', c, item.name);
+});
+
+// ============ SHOP ITEMS ============
+[
+  { name: 'Net ($100)', draw: (ctx) => {
+    ctx.strokeStyle = '#8D6E63'; ctx.lineWidth = 2;
+    // Handle
+    ctx.beginPath(); ctx.moveTo(20, 75); ctx.lineTo(50, 30); ctx.stroke();
+    // Net circle
+    ctx.beginPath(); ctx.arc(60, 25, 18, 0, Math.PI * 2); ctx.stroke();
+    // Grid
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.moveTo(45 + i * 8, 10); ctx.lineTo(45 + i * 8, 40); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(42, 14 + i * 7); ctx.lineTo(78, 14 + i * 7); ctx.stroke();
+    }
+  }},
+  { name: 'Life Potion ($1K)', draw: (ctx) => {
+    // Bottle
+    ctx.fillStyle = '#E53935';
+    ctx.beginPath(); ctx.roundRect(35, 30, 30, 40, 5); ctx.fill();
+    // Neck
+    ctx.fillStyle = '#8D6E63';
+    ctx.fillRect(44, 20, 12, 12);
+    // Cork
+    ctx.fillStyle = '#D7CCC8';
+    ctx.fillRect(46, 15, 8, 8);
+    // Heart
+    ctx.fillStyle = '#FFCDD2';
+    ctx.font = '16px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('♥', 50, 57);
+  }},
+  { name: 'Teleporter ($10K)', draw: (ctx) => {
+    // Swirl portal
+    ctx.strokeStyle = '#7C4DFF'; ctx.lineWidth = 2;
+    for (let r = 5; r < 25; r += 4) {
+      ctx.beginPath(); ctx.arc(50, 45, r, r * 0.1, Math.PI * 2 - r * 0.1); ctx.stroke();
+    }
+    ctx.fillStyle = '#B388FF';
+    ctx.beginPath(); ctx.arc(50, 45, 5, 0, Math.PI * 2); ctx.fill();
+  }},
+  { name: 'Wallpaper ($60)', draw: (ctx) => {
+    ctx.fillStyle = '#E3F2FD';
+    ctx.fillRect(20, 15, 60, 55);
+    // Cloud pattern
+    ctx.fillStyle = 'rgba(144,202,249,0.6)';
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        ctx.beginPath(); ctx.arc(30 + col * 18, 25 + row * 18, 6, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.strokeStyle = '#90CAF9'; ctx.lineWidth = 1;
+    ctx.strokeRect(20, 15, 60, 55);
+  }},
+  { name: 'Plant ($20)', draw: (ctx) => {
+    // Pot
+    ctx.fillStyle = '#8D6E63';
+    ctx.beginPath(); ctx.moveTo(35, 55); ctx.lineTo(65, 55); ctx.lineTo(60, 75); ctx.lineTo(40, 75); ctx.closePath(); ctx.fill();
+    // Plant
+    ctx.fillStyle = '#4CAF50';
+    ctx.beginPath(); ctx.ellipse(50, 45, 12, 8, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(42, 38, 10, 6, 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(58, 40, 10, 6, -0.4, 0, Math.PI * 2); ctx.fill();
+  }},
+  { name: 'Jelly Ball ($50)', draw: (ctx) => {
+    // Glowing ball
+    const glow = ctx.createRadialGradient(50, 45, 0, 50, 45, 20);
+    glow.addColorStop(0, '#E040FB'); glow.addColorStop(1, 'rgba(224,64,251,0.1)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(50, 45, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#E040FB';
+    ctx.beginPath(); ctx.arc(50, 45, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.arc(46, 41, 3, 0, Math.PI * 2); ctx.fill();
+  }},
+  { name: 'Light ($30)', draw: (ctx) => {
+    // Light fixture
+    ctx.fillStyle = '#455A64';
+    ctx.fillRect(45, 15, 10, 8);
+    // Cone
+    ctx.fillStyle = '#FFD600';
+    ctx.beginPath(); ctx.moveTo(42, 23); ctx.lineTo(50, 55); ctx.lineTo(58, 23); ctx.closePath();
+    ctx.globalAlpha = 0.4; ctx.fill();
+    ctx.globalAlpha = 1;
+    // Bulb
+    ctx.fillStyle = '#FFF9C4';
+    ctx.beginPath(); ctx.arc(50, 25, 5, 0, Math.PI * 2); ctx.fill();
+  }},
+].forEach(item => {
+  const { c, ctx } = makeCanvas(100, 90);
+  ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, 100, 90);
+  item.draw(ctx);
+  addCard('shop-row', c, item.name);
+});
+
+// ============ CHARACTER CREATOR ============
+(function(){
+  const ctx = fixCanvas('creator-canvas', 600, 300);
+  ctx.fillStyle = '#0a1a30'; ctx.fillRect(0, 0, 600, 300);
+
+  const categories = ['Hair', 'Body', 'Pants', 'Suits', 'Shoes', 'Shirt'];
+  const catColors = ['#5D4037', '#FFB74D', '#1565C0', '#E53935', '#37474F', '#66BB6A'];
+  const colW = 100;
+
+  categories.forEach((cat, i) => {
+    const x = i * colW;
+    // Header
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(x, 0, colW - 2, 30);
+    ctx.fillStyle = '#FFD700'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(cat, x + colW / 2, 20);
+
+    // 4 options per category
+    for (let j = 0; j < 4; j++) {
+      const cy = 55 + j * 60;
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.beginPath(); ctx.roundRect(x + 10, cy - 20, colW - 22, 50, 6); ctx.fill();
+
+      if (cat === 'Hair') {
+        const styles = [
+          () => { ctx.fillStyle = catColors[i]; ctx.beginPath(); ctx.arc(x + colW/2, cy, 12, Math.PI, Math.PI*2); ctx.fill(); },
+          () => { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x + colW/2, cy, 12, Math.PI, Math.PI*2); ctx.fill();
+                  ctx.beginPath(); ctx.moveTo(x+colW/2-12, cy); ctx.lineTo(x+colW/2-18, cy+12); ctx.lineWidth=3; ctx.strokeStyle='#000'; ctx.stroke(); },
+          () => { ctx.fillStyle = '#FFD600'; ctx.beginPath(); ctx.arc(x + colW/2, cy, 12, Math.PI, Math.PI*2); ctx.fill();
+                  for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(x+colW/2-8+k*8,cy+2,4,0,Math.PI*2);ctx.fill();} },
+          () => { ctx.fillStyle = '#D50000'; ctx.beginPath(); ctx.arc(x + colW/2, cy, 12, Math.PI, Math.PI*2); ctx.fill(); },
+        ];
+        styles[j]();
+      } else {
+        // Generic colored circle/rect for each option
+        const hue = (i * 60 + j * 30) % 360;
+        ctx.fillStyle = `hsl(${hue}, 60%, ${45 + j * 8}%)`;
+        if (cat === 'Body') {
+          ctx.beginPath(); ctx.roundRect(x + 30, cy - 10, 38, 25, 4); ctx.fill();
+        } else if (cat === 'Shoes') {
+          ctx.beginPath(); ctx.ellipse(x + colW/2, cy + 5, 15, 6, 0, 0, Math.PI*2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.roundRect(x + 25, cy - 8, 48, 22, 3); ctx.fill();
+        }
+      }
+    }
+  });
+})();
+
+document.getElementById('creator-num').textContent = cardNum++;
+
+</script>
+</body>
+</html>
